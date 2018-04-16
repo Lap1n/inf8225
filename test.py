@@ -2,9 +2,8 @@ import torch
 import numpy as np
 from torch.autograd import Variable
 
-from projet.a2cGold.TradingEnv import TradingEnv
-from projet.a2cGold.gold_data_loader import GoldDataLoader
-from projet.a2cGold.model import DirectRLModel
+from TradingEnv import TradingEnv
+from gold_data_loader import GoldDataLoader
 
 input_size = 45
 tick_size = 1

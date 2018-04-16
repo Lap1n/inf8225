@@ -8,18 +8,18 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import Variable
 
-from projet.a2cGold.TradingEnv import TradingEnv
-from projet.a2cGold.envs import make_env
-from projet.a2cGold.gold_data_loader import GoldDataLoader
-from projet.a2cGold.model import DirectRLModel
-from projet.a2cGold.storage import RolloutStorage
 
 from baselines.common.vec_env.dummy_vec_env import DummyVecEnv
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from projet.a2cGold.test import test_model
+from TradingEnv import TradingEnv
+from envs import make_env
+from gold_data_loader import GoldDataLoader
+from model import DirectRLModel
+from storage import RolloutStorage
+from test import test_model
 
 input_size = 45
 n_input_momentum = 5

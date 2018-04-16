@@ -4,8 +4,8 @@ import torch
 from torch import nn
 import numpy as np
 
-from projet.a2cGold.distributions import get_distribution
-from projet.a2cGold.utils import orthogonal
+from distributions import get_distribution
+from utils import orthogonal
 
 
 class Policy(nn.Module):

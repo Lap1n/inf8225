@@ -1,4 +1,4 @@
-from projet.a2cGold.TradingEnv import TradingEnv
+from TradingEnv import TradingEnv
 
 
 def make_env(data_set):

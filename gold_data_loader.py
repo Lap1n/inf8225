@@ -51,7 +51,7 @@ class GoldDataLoader(object):
         return min_ + x * (max_ - min_)
 
     def format_data(self, data_file_name):
-        with open("../data/" + data_file_name) as csvfile:
+        with open("./data/" + data_file_name) as csvfile:
             reader = csv.DictReader(csvfile)
             lastTick = None
             counter = 0
