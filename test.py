@@ -98,7 +98,7 @@ def test_model(actor_critic):
     mean_trades = np.mean(nb_of_trades)
     scores_variance = np.var(scores)
     print(
-        "mean score:{} variance: {} nbOfTrades:{} total_reward:{}".format(mean_scores,
+        "mean score:{} variance au carree : {} nbOfTrades:{} total_reward:{}".format(mean_scores,
                                                                           scores_variance,
                                                                           mean_trades, total_reward))
     max = np.max(scores)
