@@ -6,12 +6,6 @@ from gym import spaces
 
 
 class TradingEnv(gym.Env):
-    """
-    Define a simple Banana environment.
-    The environment defines which actions can be taken at which point and
-    when the agent receives which reward.
-    """
-
     def __init__(self, data_source, random_mode=True):
         self.__version__ = "0.1.0"
         print("TradingEnv - Version {}".format(self.__version__))
