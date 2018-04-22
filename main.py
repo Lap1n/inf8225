@@ -29,7 +29,7 @@ ticks_per_day = int(450 / tick_size)
 data_set = GoldDataLoader(input_size=input_size, n_input_momentum=n_input_momentum, tick_size=tick_size)
 
 num_frames = 1
-num_steps = 405
+num_steps = 200
 
 num_processes = 10
 
