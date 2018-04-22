@@ -10,21 +10,18 @@ tick_size = 1
 n_input_momentum = 5
 batch_size = 1
 num_processes = 1
-data_set = GoldDataLoader(input_size=input_size, n_input_momentum=n_input_momentum, tick_size=tick_size)
-
-test_env = TradingEnv(data_set, False)
+# data_set = GoldDataLoader(input_size=input_size, n_input_momentum=n_input_momentum, tick_size=tick_size)
 
 best_score = 0
 ticks_per_day = int(450 / tick_size)
 
-
 use_cuda = False
 
 
-def test_model(actor_critic):
+def test_model(test_env, actor_critic):
     scores = []
     nb_of_trades = []
-    n_batch = data_set.train_set.shape[0] / batch_size
+    n_batch = test_env.data_source.train_set.shape[0] / batch_size
 
     for a_random_day in range(int(n_batch)):
         score = 0
@@ -53,7 +50,8 @@ def test_model(actor_critic):
             value, action, action_log_prob, states = actor_critic.act(
                 Variable(current_obs, volatile=True),
                 Variable(states.data, volatile=True),
-                Variable(mask.data, volatile=True))
+                Variable(mask.data, volatile=True),
+                deterministic=False)
 
             if test_time_step == ticks_per_day - input_size - 1 - 1:
                 cpu_actions = (torch.FloatTensor(np.ones(1))).cpu().numpy()
@@ -69,7 +67,7 @@ def test_model(actor_critic):
                 day_trades += 1
 
             # If done then clean the history of observations.
-            if done is True:
+            if np.all(done):
                 masks = torch.FloatTensor([0.0])
                 break
             else:

@@ -3,6 +3,8 @@
 import torch
 from torch import nn
 import numpy as np
+from torch.autograd import Variable
+import torch.nn.functional as F
 
 from distributions import get_distribution
 from utils import orthogonal
@@ -60,6 +62,18 @@ class DirectRLModel(Policy):
             nn.Linear(512, 20),
             nn.ReLU(),
         )
+
+        self.seq_dropout = nn.Sequential(
+            nn.Linear(input_size, 512),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.Linear(512, 512),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.Linear(512, 20),
+            nn.ReLU(),
+        )
+
         self.apply(self.weights_init)
 
         # Initialisation de la partie rnn du réseau
@@ -101,6 +115,168 @@ class DirectRLModel(Policy):
 
     def forward(self, inputs, states, masks):
         x = self.seq_no_dropout(inputs)
+        if inputs.size(0) == states.size(0):
+            x = states = self.rnn(x, states * masks)
+        else:
+            x = x.view(-1, states.size(0), x.size(1))
+            masks = masks.view(-1, states.size(0), 1)
+            outputs = []
+            for i in range(x.size(0)):
+                hx = states = self.rnn(x[i], states * masks[i])
+                outputs.append(hx)
+            x = torch.cat(outputs, 0)
+        return x, x, states
+
+
+class DirectAutoEncoderRLModel(Policy):
+    def __init__(self, input_size, hidden_size, action_space, num_layers=1):
+        super(DirectAutoEncoderRLModel, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.input_size = input_size
+        self.action_space = action_space
+
+        self.seq_no_dropout = nn.Sequential(
+            # Encoder
+            nn.Linear(input_size, input_size//2),
+            nn.ReLU(),
+            nn.Linear( input_size//2,  3),
+            # Decoder
+            nn.Linear(3,  input_size//2),
+            nn.ReLU(),
+            nn.Linear(input_size // 2, input_size),
+            nn.ReLU(),
+        )
+        self.apply(self.weights_init)
+
+        # Initialisation de la partie rnn du réseau
+        self.rnn = nn.GRUCell(input_size, hidden_size)
+
+        # Initialisation de la critique v(s) dans A2c
+        self.critic_linear = nn.Linear(hidden_size, 1)
+
+        # # Initialisation de l'acteur qui décidera des actions entre Short (0), Neutral (1) ou Buy (2) dans A2c
+        self.dist = get_distribution(hidden_size, self.action_space)
+
+    @property
+    def state_size(self):
+        return self.hidden_size
+
+    def weights_init(self, m):
+        classname = m.__class__.__name__
+        if classname.find('Conv') != -1:
+            weight_shape = list(m.weight.data.size())
+            fan_in = np.prod(weight_shape[1:4])
+            fan_out = np.prod(weight_shape[2:4]) * weight_shape[0]
+            w_bound = np.sqrt(6. / (fan_in + fan_out))
+            m.weight.data.uniform_(-w_bound, w_bound)
+            m.bias.data.fill_(0)
+        elif classname.find('Linear') != -1:
+            weight_shape = list(m.weight.data.size())
+            fan_in = weight_shape[1]
+            fan_out = weight_shape[0]
+            w_bound = np.sqrt(6. / (fan_in + fan_out))
+            m.weight.data.uniform_(-w_bound, w_bound)
+            m.bias.data.fill_(0)
+
+    def reset_parameters(self):
+        orthogonal(self.gru.weight_ih.data)
+        orthogonal(self.gru.weight_hh.data)
+        self.gru.bias_ih.data.fill_(0)
+        self.gru.bias_hh.data.fill_(0)
+        self.critic_linear.bias.data.fill_(0)
+
+    def forward(self, inputs, states, masks):
+        x = self.seq_no_dropout(inputs)
+        if inputs.size(0) == states.size(0):
+            x = states = self.rnn(x, states * masks)
+        else:
+            x = x.view(-1, states.size(0), x.size(1))
+            masks = masks.view(-1, states.size(0), 1)
+            outputs = []
+            for i in range(x.size(0)):
+                hx = states = self.rnn(x[i], states * masks[i])
+                outputs.append(hx)
+            x = torch.cat(outputs, 0)
+        return x, x, states
+
+
+class DirectRLCNNModel(Policy):
+    def __init__(self, input_size, hidden_size, action_space, num_layers=1):
+        super(DirectRLCNNModel, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.input_size = input_size
+        self.action_space = action_space
+
+        self.seq_len = 5
+
+        self.conv1 = nn.Conv1d(1, 32, 8, stride=4)
+        self.conv2 = nn.Conv1d(32, 64, 4, stride=2)
+        self.conv3 = nn.Conv1d(64, 32, 3, stride=1)
+
+        self.linear1 = nn.Linear(64, 512)
+        self.apply(self.weights_init)
+
+        # self.flat_dim = self.get_flat_mat_after_conv((1, 1, input_size), self.seq_no_dropout)
+
+        # Initialisation de la partie rnn du réseau
+        self.rnn = nn.GRUCell(512, hidden_size)
+
+        # Initialisation de la critique v(s) dans A2c
+        self.critic_linear = nn.Linear(hidden_size, 1)
+
+        # # Initialisation de l'acteur qui décidera des actions entre Short (0), Neutral (1) ou Buy (2) dans A2c
+        self.dist = get_distribution(hidden_size, self.action_space)
+        # Cette fonction obtient la dimension de la matrice resultante des convolutions
+
+    def get_flat_mat_after_conv(self, in_size, fts):
+        f = fts(Variable(torch.ones(1, *in_size)))
+        return int(np.prod(f.size()[1:]))
+
+    @property
+    def state_size(self):
+        return self.hidden_size
+
+    def weights_init(self, m):
+        classname = m.__class__.__name__
+        if classname.find('Conv') != -1:
+            weight_shape = list(m.weight.data.size())
+            fan_in = np.prod(weight_shape[1:4])
+            fan_out = np.prod(weight_shape[2:4]) * weight_shape[0]
+            w_bound = np.sqrt(6. / (fan_in + fan_out))
+            m.weight.data.uniform_(-w_bound, w_bound)
+            m.bias.data.fill_(0)
+        elif classname.find('Linear') != -1:
+            weight_shape = list(m.weight.data.size())
+            fan_in = weight_shape[1]
+            fan_out = weight_shape[0]
+            w_bound = np.sqrt(6. / (fan_in + fan_out))
+            m.weight.data.uniform_(-w_bound, w_bound)
+            m.bias.data.fill_(0)
+
+    def reset_parameters(self):
+        orthogonal(self.gru.weight_ih.data)
+        orthogonal(self.gru.weight_hh.data)
+        self.gru.bias_ih.data.fill_(0)
+        self.gru.bias_hh.data.fill_(0)
+        self.critic_linear.bias.data.fill_(0)
+
+    def forward(self, inputs, states, masks):
+        inputs = inputs.view(-1, 1, inputs.shape[1])
+        x = self.conv1(inputs)
+        x = F.relu(x)
+
+        x = self.conv2(x)
+        x = F.relu(x)
+
+        x = self.conv3(x)
+        x = F.relu(x)
+
+        x = x.view(-1, 64)
+        x = self.linear1(x)
+        x = F.relu(x)
+
         if inputs.size(0) == states.size(0):
             x = states = self.rnn(x, states * masks)
         else:

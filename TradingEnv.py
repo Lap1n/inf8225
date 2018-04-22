@@ -28,6 +28,8 @@ class TradingEnv(gym.Env):
 
         self.z_min_max = data_source.z_min_max
         self.day_index = 0
+        self.current_day_profit = 0
+        self.MAX_DAY_LOSS = -50.0
 
     def render(self, mode='human'):
         pass
@@ -68,9 +70,13 @@ class TradingEnv(gym.Env):
             self.num_trades += 1
 
         self.previous_action = action
+
+        self.current_day_profit += r_t
+
         return r_t
 
     def is_done(self):
+        # return self.intraday_index == self.current_day_data.shape[0] - 1 or self.current_day_profit < self.MAX_DAY_LOSS
         return self.intraday_index == self.current_day_data.shape[0] - 1
 
     def _get_reward(self):
@@ -84,6 +90,7 @@ class TradingEnv(gym.Env):
         self.previous_action = 0
         self.current_delta_price = 0
         self.num_trades = 0
+        self.current_day_profit = 0
 
         return self._get_state()
 
